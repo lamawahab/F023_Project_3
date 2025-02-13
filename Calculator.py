@@ -38,8 +38,9 @@ class NumberPadCalculator:
     
     safe_dict = {
             "sqrt": math.sqrt,
-
-            
+            "log": math.log,
+            "pow": math.pow,
+            "π":math.pi,
         }
         
     def create_number_buttons(self):
@@ -67,9 +68,41 @@ class NumberPadCalculator:
                          command= self.clear)
         button_clear.grid(row=4, column=2, padx=5, pady=5)
         
-        button_plus = tk.Button(self.root, text="(√)", font=("Arial", 20), width=5, height=2,
-                                command= lambda: self.click("sqrt("))
+        button_plus = tk.Button(self.root, text="+", font=("Arial", 20), width=5, height=2,
+                                command= lambda: self.click("+"))
         button_plus.grid(row=1, column=3, padx=5, pady=5)
+        
+        button_minus = tk.Button(self.root, text="-", font=("Arial", 20), width=5, height=2,
+                                command=lambda: self.click("-"))
+        button_minus.grid(row=2, column=3, padx=5, pady=5)
+       
+        button_exponent = tk.Button(self.root, text="Exponent", font=("Arial", 20), width=5, height=2,
+                                command=lambda: self.click("**"))
+        button_exponent.grid(row=3, column=3, padx=5, pady=5)
+       
+        button_square = tk.Button(self.root, text="X²", font=("Arial", 20), width=5, height=2,
+                                command=lambda: self.click("**2"))
+        button_square.grid(row=3, column=4, padx=5, pady=5)
+       
+        button_bracket1 = tk.Button(self.root, text="(√)", font=("Arial", 20), width=5, height=2,
+                                command=lambda: self.click("sqrt("))
+        button_bracket1.grid(row=4, column=3, padx=5, pady=5)
+       
+        button_bracket1 = tk.Button(self.root, text="(", font=("Arial", 20), width=5, height=2,
+                                command=lambda: self.click("("))
+        button_bracket1.grid(row=1, column=4, padx=5, pady=5)
+       
+        button_bracket2 = tk.Button(self.root, text=")", font=("Arial", 20), width=5, height=2,
+                                command=lambda: self.click(")"))
+        button_bracket2.grid(row=1, column=5, padx=5, pady=5)
+       
+        button_PI = tk.Button(self.root, text="π", font=("Arial", 20), width=5, height=2,
+                                command=lambda: self.click("π"))
+        button_PI.grid(row=2, column=4, padx=5, pady=5)
+       
+        button_log = tk.Button(self.root, text="log(x)", font=("Arial", 20), width=5, height=2,
+                                command=lambda: self.click("log("))
+        button_log.grid(row=3, column=4, padx=5, pady=5)
         
     
 
