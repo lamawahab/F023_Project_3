@@ -2,6 +2,54 @@ import tkinter as tk
 from tkinter import messagebox
 import datetime
 
+import sqlite3
+
+#to generate reference number 
+import random
+import string
+
+
+
+def insert_booking(first_name, last_name, passport_number, seat_row, seat_column):
+    """Insert a booking with a unique reference into the database."""
+    booking_reference = generate_booking_reference()
+    cursor.execute('''
+        INSERT INTO customer_bookings (booking_reference, first_name, last_name, passport_number, seat_row, seat_column)
+        VALUES (?, ?, ?, ?, ?, ?)
+    ''', (booking_reference, first_name, last_name, passport_number, seat_row, seat_column))
+    conn.commit()
+
+def fetch_all_bookings():
+    """Retrieve all booking records from the database."""
+    conn = sqlite3.connect('booking_system.db')
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM customer_bookings")
+    results = cursor.fetchall()
+    conn.close()
+    return results
+
+def remove_booking(seat_row, seat_column):
+    """Delete a booking based on seat row and column."""
+    conn = sqlite3.connect('booking_system.db')
+    cursor = conn.cursor()
+    cursor.execute('''
+        DELETE FROM customer_bookings
+        WHERE seat_row = ? AND seat_column = ?
+    ''', (seat_row, seat_column))
+    conn.commit()
+    conn.close()
+
+used_ref = set()
+def generate_booking_reference():
+    """Generate a unique 8-character alphanumeric booking reference."""
+    while True:
+        ref = ''.join(random.choices(string.ascii_uppercase + string.digits, k=8))
+        if ref not in used_ref:
+            used_ref.add(ref)
+            return ref
+
+
+
 # Initializing the seat layout with 'F' for free, 'R' for reserved, 'X' for aisles
 seats = [
     ['F']*20,  # Row 1
@@ -44,6 +92,12 @@ class SeatBookingSystem:
         self.status_button = tk.Button(root, text="Show Status", command=self.show_status, font=('Arial', 12), width=20)
         self.status_button.grid(row=8, column=4, columnspan=4, pady=10)
 
+        self.show_bookings_button = tk.Button(root, text="Show All Bookings", command=self.show_all_bookings, font=('Arial', 12), width=20)
+        self.show_bookings_button.grid(row=8, column=8, columnspan=4, pady=10)
+
+        self.show_history_button = tk.Button(root, text="Show Booking History", command=self.show_history, font=('Arial', 12), width=20)
+        self.show_history_button.grid(row=8, column=12, columnspan=4, pady=10)
+
         # Input field for entering seat selection
         self.seat_label = tk.Label(root, text="Enter seat (e.g., 1A, 2B):", font=('Arial', 12))
         self.seat_label.grid(row=9, column=0, columnspan=2, pady=5)
@@ -74,16 +128,16 @@ class SeatBookingSystem:
     def book_seat(self):
         """Book a seat by selecting a row and column."""
         seat_input = self.seat_input.get().upper()
-        if len(seat_input) <2 or len(seat_input) > 3:
+        if len(seat_input) < 2 or len(seat_input) > 3:
             messagebox.showerror("Invalid Input", "Please enter a valid seat (e.g., 1A, 2B).")
             return
 
         row = ord(seat_input[-1]) - 65  # Convert column letter to index (A=0, B=1, etc.)
         col = int(seat_input[:-1]) - 1  # Convert row number to 0-based index
         lower = False
-        if (row >= 3):
-             row += 1  # Adjust row for the aisle row
-             lower = True
+        if row >= 3:
+            row += 1  # Adjust row for the aisle row
+            lower = True
 
         if row < 0 or row >= len(seats) or col < 0 or col >= len(seats[0]):
             messagebox.showerror("Invalid Seat", "Please enter a valid seat number within the seating range.")
@@ -92,18 +146,53 @@ class SeatBookingSystem:
         if seats[row][col] == 'X':
             messagebox.showerror("Aisle Seat", "This seat is an aisle seat and cannot be booked.")
             return
-        
+
         if seats[row][col] == 'S':
             messagebox.showerror("Storage Seat", "This seat is a storage seat and cannot be booked.")
             return
 
         if seats[row][col] == 'F':
-            seats[row][col] = 'R'  # Mark the seat as reserved
-            self.add_to_history(seat_input, 'Booked')
-            messagebox.showinfo("Seat Booked", f"Seat {col+1}{chr(65+row- 1) if lower else chr(65+row)} has been successfully booked.")
-            self.update_seat_label(row, col)
+            # Open a form to collect passenger details
+            self.open_passenger_form(row, col, seat_input,lower)
         else:
             messagebox.showerror("Seat Occupied", "This seat is already reserved!")
+
+    def open_passenger_form(self, row, col, seat_input,lower):
+        """Open a form to collect passenger details."""
+        form = tk.Toplevel(self.root)
+        form.title("Passenger Details")
+
+        tk.Label(form, text="First Name:").grid(row=0, column=0, padx=5, pady=5)
+        first_name_entry = tk.Entry(form)
+        first_name_entry.grid(row=0, column=1, padx=5, pady=5)
+
+        tk.Label(form, text="Last Name:").grid(row=1, column=0, padx=5, pady=5)
+        last_name_entry = tk.Entry(form)
+        last_name_entry.grid(row=1, column=1, padx=5, pady=5)
+
+        tk.Label(form, text="Passport Number:").grid(row=2, column=0, padx=5, pady=5)
+        passport_entry = tk.Entry(form)
+        passport_entry.grid(row=2, column=1, padx=5, pady=5)
+
+        def submit_details():
+            first_name = first_name_entry.get()
+            last_name = last_name_entry.get()
+            passport_number = passport_entry.get()
+
+            if not first_name or not last_name or not passport_number:
+                messagebox.showerror("Incomplete Details", "Please fill in all fields.")
+                return
+
+            booking_ref = generate_booking_reference()
+            seats[row][col] = booking_ref  # Mark the seat as reserved
+            self.add_to_history(seat_input, f"booked: {booking_ref}, Name: {first_name} {last_name}, Passport: {passport_number}")
+
+            insert_booking(first_name, last_name, passport_number, seat_input[-1], col+1)
+            messagebox.showinfo("Seat Booked", f"Seat {col+1}{chr(65+row-1) if lower else chr(65+row)} has been successfully booked. Booking Reference: {booking_ref}")
+            self.update_seat_label(row, col)
+            form.destroy()
+
+        tk.Button(form, text="Submit", command=submit_details).grid(row=3, column=0, columnspan=2, pady=10)
 
     def free_seat(self):
         """Free a reserved seat."""
@@ -131,9 +220,10 @@ class SeatBookingSystem:
             messagebox.showerror("Storage Seat", "This seat is a storage seat and cannot be freed.")
             return
 
-        if seats[row][col] == 'R':
+        if seats[row][col] in used_ref:
             seats[row][col] = 'F'  # Mark the seat as free
             self.add_to_history(seat_input, 'Freed')
+            remove_booking(seat_input[-1], col + 1)  # Remove booking from database
             messagebox.showinfo("Seat Freed", f"Seat {col+1}{chr(65+row-1) if lower else chr(65+row)} has been successfully freed.")
             self.update_seat_label(row, col)
         else:
@@ -153,13 +243,20 @@ class SeatBookingSystem:
 
     def show_history(self):
         """Show reservation history for a seat."""
-        seat_input = self.seat_input.get().upper()
-        if seat_input in self.reservation_history:
-            history = self.reservation_history[seat_input]
-            history_str = "\n".join([f"{entry['timestamp']} - {entry['action']}" for entry in history])
-            messagebox.showinfo(f"Reservation History for Seat {seat_input}", history_str)
-        else:
-            messagebox.showinfo("No History", f"No history available for Seat {seat_input}")
+        history_window = tk.Toplevel(self.root)
+        history_window.title("Booking History")
+
+        history_text = tk.Text(history_window, wrap='word', font=('Arial', 12))
+        history_text.pack(expand=True, fill='both')
+
+        for seat, history in self.reservation_history.items():
+            history_text.insert('end', f"Seat {seat}:\n")
+            for entry in history:
+                history_text.insert('end', f"  {entry['timestamp']} - {entry['action']}\n")
+            history_text.insert('end', "\n")
+
+        history_text.config(state='disabled')
+
     def show_status(self):
         """Show the status of a selected seat."""
         seat_input = self.seat_input.get().upper()
@@ -196,7 +293,7 @@ class SeatBookingSystem:
         label = self.labels[row][col]
         if seat == 'F':
             label.config(bg='lightgreen')
-        elif seat == 'R':
+        elif seat in used_ref:
             label.config(bg='lightcoral')
         elif seat == 'X':
             label.config(bg='gray')
@@ -208,6 +305,42 @@ class SeatBookingSystem:
         for row in range(7):
             for col in range(20):
                 self.update_seat_label(row, col)
+
+    def show_all_bookings(self):
+        """Show all bookings in a new window."""
+        bookings = fetch_all_bookings()
+        if not bookings:
+            messagebox.showinfo("No Bookings", "There are no bookings to display.")
+            return
+
+        bookings_window = tk.Toplevel(self.root)
+        bookings_window.title("All Bookings")
+
+        headers = ["ID", "Booking Reference", "First Name", "Last Name", "Passport Number", "Seat Row", "Seat Column"]
+        for col, header in enumerate(headers):
+            tk.Label(bookings_window, text=header, font=('Arial', 12, 'bold')).grid(row=0, column=col, padx=5, pady=5)
+
+        for row, booking in enumerate(bookings, start=1):
+            for col, value in enumerate(booking):
+                tk.Label(bookings_window, text=value, font=('Arial', 12)).grid(row=row, column=col, padx=5, pady=5)
+
+
+# Connect to a database (it creates the file if it doesn't exist)
+conn = sqlite3.connect('booking_system.db')
+cursor = conn.cursor()
+# Create a table to store customer bookings
+cursor.execute('''
+    CREATE TABLE IF NOT EXISTS customer_bookings (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        booking_reference TEXT UNIQUE,
+        first_name TEXT,
+        last_name TEXT,
+        passport_number TEXT,
+        seat_row TEXT,
+        seat_column INTEGER
+    )
+''')
+
 
 # Create the Tkinter window
 root = tk.Tk()
